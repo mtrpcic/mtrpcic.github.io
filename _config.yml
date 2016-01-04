@@ -1,0 +1,29 @@
+title: Mike Trpcic
+description: Thoughts and Musings on codes and computes
+
+url: https://mtrpcic.net
+baseurl: ""
+paginate_path: "blog/page:num/"
+permalink: blog/:title/
+
+markdown: redcarpet
+redcarpet:
+  extensions: ["no_intra_emphasis", "fenced_code_blocks", "autolink", "tables", "with_toc_data"]
+highlighter: pygments
+gems: [jekyll-paginate]
+paginate: 5
+
+navigation:
+ - title: Home
+   url: /index.html
+ - title: About
+   url: /about
+ - title: Contact
+   url: /contact
+
+social:
+   github: mtrpcic
+   twitter: mtrpcic
+   email: mike@mtrpcic.net
+
+google_analytics: ""
