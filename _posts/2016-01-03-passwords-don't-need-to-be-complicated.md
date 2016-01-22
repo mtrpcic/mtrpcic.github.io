@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Passwords Don't Need to be Complicated"
-date:   2015-01-03
+date:   2016-01-03
 ---
 The state of the password has changed a lot over the past several decades, and unfortunately, not for the better.  First, everyone had a few online accounts, and using the same password for the two or three accounts you might have had was probably pretty common. A few years go by and there are a whole slew of new services and sites, each with their own accounts and passwords. By now, it was common knowledge that using the same password for everything was Bad&#8482;, so we started using a new password for every service. Time ticked on, and we all had 50 accounts across the web, and Password Managers become the best way to manage a veritable novel of usersnames and passwords.
 

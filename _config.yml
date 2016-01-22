@@ -1,5 +1,5 @@
 title: Mike Trpcic
-description: Thoughts and Musings on codes and computes
+description: "Coder, Manager, and Technoloy Enthusiast"
 
 url: https://mtrpcic.net
 baseurl: ""
@@ -10,12 +10,22 @@ markdown: redcarpet
 redcarpet:
   extensions: ["no_intra_emphasis", "fenced_code_blocks", "autolink", "tables", "with_toc_data"]
 highlighter: pygments
-gems: [jekyll-paginate]
+
+gems:
+  - jekyll-paginate
+  - jekyll-redirect-from
+
+whitelist:
+  - jekyll-paginate
+  - jekyll-redirect-from
+
 paginate: 5
 
 navigation:
  - title: Home
    url: /index.html
+ - title: Series
+   url: /series
  - title: About
    url: /about
  - title: Contact
@@ -26,4 +36,4 @@ social:
    twitter: mtrpcic
    email: mike@mtrpcic.net
 
-google_analytics: ""
+google_analytics: "UA-60246214-1"

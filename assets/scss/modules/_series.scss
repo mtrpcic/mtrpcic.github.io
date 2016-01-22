@@ -1,0 +1,26 @@
+ol.series-list {
+	line-height: 24px;
+	font-family: 'Open Sans';
+	color: $grey;
+	font-size: 14px;
+	vertical-align: middle;
+
+	li {
+		vertical-align: middle;
+		h3 {
+			font-size: 24px;
+
+			span.date {
+				line-height: 24px;
+				font-size: 16px;
+				vertical-align: middle;
+				margin-left: 15px;
+			}
+
+			a {
+				line-height: 24px;
+				vertical-align: middle;
+			}
+		}
+	}
+}

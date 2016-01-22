@@ -6,21 +6,62 @@ title: Series
 <div class="home" id="home">
   <h1 class="pageTitle">Series</h1>
   <ul class="posts noList">
-    {% for post in paginator.posts %}
-      <li>
-        <span class="date">{{ post.date | date: '%B %d, %Y' }}</span>
-        <h3><a class="post-link" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a></h3>
-        <p class="description">{% if post.description %}{{ post.description | strip_html | strip_newlines | truncate: 250 }}{% else %}{{ post.content | strip_html | strip_newlines | truncate: 250 }}{% endif %}</p>
-      </li>
-    {% endfor %}
+    <!-- ORM Adventures-->
+    <li>
+      <h3>ORM Adventures</h3>
+      {% assign tag_key = "tempest" %}
+      <p class="description">
+        One of the most important pieces of modern web applications is the data access layer, routinely found in the form of an ORM. While everybody uses them, not many people have dug through the insides to see what makes them tick. I wanted to give it a shot and see what was up.
+      </p>
+
+      <ol class="series-list">
+        {% for post in site.posts %}
+          {% for itag in post.tags %}
+            {% if itag == tag_key %}
+              {% assign has_tag = true %}
+            {% endif %}
+          {% endfor %}
+
+          {% if has_tag %}
+            <li>
+              <h3>
+                <a class="" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
+                <span class="date">{{ post.date | date: '%B %d, %Y' }}</span>
+              </h3>
+            </li>  
+          {% endif %}
+          {% assign has_tag = false %}
+        {% endfor %}
+      </ol>
+    </li>
+
+    <!-- GameDev-->
+    <li>
+      <h3>GameDev</h3>
+      {% assign tag_key = "chamber" %}
+      <p class="description">
+        I've always tinkered with game development, and it was actually what originally drew me to programming when I was 12. After years of toy projects, trial and error, and endless sidetracks, I decided to hunker down and put something together.
+      </p>
+
+      <ol class="series-list">
+        {% for post in site.posts %}
+          {% for itag in post.tags %}
+            {% if itag == tag_key %}
+              {% assign has_tag = true %}
+            {% endif %}
+          {% endfor %}
+
+          {% if has_tag %}
+            <li>
+              <h3>
+                <a class="" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
+                <span class="date">{{ post.date | date: '%B %d, %Y' }}</span>
+              </h3>
+            </li>  
+          {% endif %}
+          {% assign has_tag = false %}
+        {% endfor %}
+      </ol>
+    </li>
   </ul>
-  <!-- Pagination links -->
-  <div class="pagination">
-    {% if paginator.previous_page %}
-      <a href="{{ paginator.previous_page_path | prepend: site.baseurl }}" class="previous button__outline">Newer Posts</a> 
-    {% endif %}
-    {% if paginator.next_page %}
-      <a href="{{ paginator.next_page_path | prepend: site.baseurl }}" class="next button__outline">Older Posts</a>
-    {% endif %}
-  </div>
 </div>
