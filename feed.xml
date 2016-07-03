@@ -1,21 +1,649 @@
----
-layout: null
----
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>{{ site.title | xml_escape }}</title>
-    <description>{{ site.description | xml_escape }}</description>
-    <link>{{ site.url }}{{ site.baseurl }}/</link>
-    <atom:link href="{{ "/feed.xml" | prepend: site.baseurl | prepend: site.url }}" rel="self" type="application/rss+xml" />
-    {% for post in site.posts limit:10 %}
+    <title>Mike Trpcic</title>
+    <description>Coder, Manager, and Technoloy Enthusiast</description>
+    <link>https://mtrpcic.net/</link>
+    <atom:link href="https://mtrpcic.net/feed.xml" rel="self" type="application/rss+xml"/>
+    <pubDate>Sun, 03 Jul 2016 07:25:11 +0000</pubDate>
+    <lastBuildDate>Sun, 03 Jul 2016 07:25:11 +0000</lastBuildDate>
+    <generator>Jekyll v2.4.0</generator>
+    
+      
       <item>
-        <title>{{ post.title | xml_escape }}</title>
-        <description>{{ post.content | xml_escape }}</description>
-        <pubDate>{{ post.date | date: "%a, %d %b %Y %H:%M:%S %z" }}</pubDate>
-        <link>{{ post.url | prepend: site.baseurl | prepend: site.url }}</link>
-        <guid isPermaLink="true">{{ post.url | prepend: site.baseurl | prepend: site.url }}</guid>
+        <title>Deep Diving into ORMs</title>
+        <description>&lt;p&gt;It&amp;#39;s rare that I advocate writing something from scratch when an off-the-shelf solution will fit your needs perfectly, as is almost always the case with an ORM.  This time, I got a little too curious, and I &lt;em&gt;wanted&lt;/em&gt; to know how the sausage was made.&lt;/p&gt;
+
+&lt;p&gt;It all began with a discussion at work about which ORM solution we should poke with a few sticks. Our schema can be a little &lt;em&gt;wonky&lt;/em&gt;, and we&amp;#39;re doing a few &lt;em&gt;strange&lt;/em&gt; things, and a good chunk of the off-the-shelf offerings work great when everything is done &lt;em&gt;perfectly&lt;/em&gt;.  We weren&amp;#39;t perfect. It was time to figure out how these things &lt;em&gt;really&lt;/em&gt; worked. It took less than 30 minutes for my insanity-riddled brain to decide, &amp;quot;Hey yeah, you could probably just write one from scratch really quick.&amp;quot;.  Oh boy.&lt;/p&gt;
+
+&lt;h3 id=&quot;what-39-s-it-gotta-do&quot;&gt;What&amp;#39;s it gotta do?&lt;/h3&gt;
+
+&lt;p&gt;Like almost any library or project I work on, I try to tease out the public API first.  It&amp;#39;s a lot easier to architect something if you know what you want the finished product to look like. An architect always draws the building before putting down a foundation.&lt;/p&gt;
+
+&lt;h4 id=&quot;models&quot;&gt;Models&lt;/h4&gt;
+
+&lt;p&gt;At the most basic level, the ORM has to handle mapping objects to data from your database. I&amp;#39;m a big fan of the patterns that &lt;a href=&quot;http://guides.rubyonrails.org/active_record_basics.html&quot;&gt;ActiveRecord&lt;/a&gt; and &lt;a href=&quot;https://laravel.com/docs/5.0/eloquent&quot;&gt;Eloquent&lt;/a&gt; have taken, and used them for inspiration.  Users should be able to define a model by defining a simple class.  A few pieces of configuration should also be provided in the form of static variables:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $table = null;&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $primary_key = null;&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Models should provide a few simple methods that can access, modify, and delete data.  Instances of models should also have methods to persist changes to the database, and to delete the local instance:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static find($primary_key){...}&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static destroy($primary_key){...}&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public save(){...}&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public delete(){...}&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h4 id=&quot;query-interface&quot;&gt;Query Interface&lt;/h4&gt;
+
+&lt;p&gt;The methods above are pretty &lt;em&gt;ok&lt;/em&gt;, but they&amp;#39;re nowhere near advanced enough to handle the types of data and relationships that we&amp;#39;ll be dealing with in the real world.  The Query Interface is the combination of more advanced methods that allow users to build more complex queries. These methods allow users to add limits, ordering information, and custom query parameters:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;Model::where(&amp;quot;column &amp;gt; ?&amp;quot;, 10).limit(50).order(&amp;quot;created_at&amp;quot;);&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Users should be able to chain as many of these methods as they want, eventually calling &amp;quot;execute&amp;quot; to get the data.  Some other methods also &amp;quot;end&amp;quot; the chain and return explicit values:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;Model::where(&amp;quot;a &amp;gt; ?&amp;quot;, 10)-&amp;gt;execute(); // Get the data&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;Model::where(&amp;quot;a &amp;gt; ?&amp;quot;, 10)-&amp;gt;count(); // Count the records&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;Model::where(&amp;quot;a &amp;gt; ?&amp;quot;, 10)-&amp;gt;sample(5); // Randomly sample n records&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h4 id=&quot;associations&quot;&gt;Associations&lt;/h4&gt;
+
+&lt;p&gt;Now that I knew how the API would work (from an absurdly high level), it&amp;#39;s time to figure out how associations should be defined.  Most of your models are going to have related data in another table, and it should be easy to get to it.  I opted for having a single static array to define each of my association types.  It forces a logical grouping for your associations in code, and the Associative Array syntax makes the task easy:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class User extends Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $has_many = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;tasks&amp;quot; =&amp;gt; [&amp;quot;class&amp;quot; =&amp;gt; &amp;quot;Task&amp;quot;, &amp;quot;foreign_key&amp;quot; =&amp;gt; &amp;quot;owner_id&amp;quot;],&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ];&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    public static $belongs_to = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;team&amp;quot; =&amp;gt; [&amp;quot;class&amp;quot; =&amp;gt; &amp;quot;Team&amp;quot;]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ];&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    public static $has_one = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;profile&amp;quot; =&amp;gt; [&amp;quot;class&amp;quot; =&amp;gt; &amp;quot;Profile&amp;quot;]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ];&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h4 id=&quot;validations&quot;&gt;Validations&lt;/h4&gt;
+
+&lt;p&gt;Models should provide a simple way to ensure that data is properly formatted before it gets stored in the database; we need to &lt;em&gt;validate&lt;/em&gt; it. Much like my approach to Associations, all validations will be defined in one big bucket:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class User extends Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $validations = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;name&amp;quot; =&amp;gt; [&amp;quot;present&amp;quot;],&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;email&amp;quot; =&amp;gt; [&amp;quot;present&amp;quot;, &amp;quot;unique&amp;quot;, &amp;quot;email&amp;quot;]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;For the time being, I&amp;#39;m not going to concern myself with exactly how a string like &amp;quot;present&amp;quot; will convert into a validation.  Remember, at this point, we&amp;#39;re just painting with broad strokes.  We can worry about the details later.&lt;/p&gt;
+
+&lt;h4 id=&quot;scopes&quot;&gt;Scopes&lt;/h4&gt;
+
+&lt;p&gt;A lot of times, you&amp;#39;ll be accessing data in a similar pattern.  Blogs almost always order posts with the most-recent submissions being first. Perhaps your blog posts will have a &amp;quot;Published&amp;quot; flag, to determine if they&amp;#39;re visible or not.  These things should be easy to define on the model, so users don&amp;#39;t need to rewrite the same query over-and-over.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class Post extends Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $scopes = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;published&amp;quot; =&amp;gt; [],&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;recent&amp;quot; =&amp;gt; []&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;I toyed with the idea of using another class-level object to group these together, but scopes are so highly configurable that that solution felt limiting.  Scopes should be able to define filter criteria, order clauses, limits, and more.  I opted for using a method name convention on the class level instead:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class Post extends Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    function scopePublished(){&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        return self::where(&amp;quot;published = true&amp;quot;);&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    }&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    function scopeRecent(){&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        return self::order(&amp;quot;created_at&amp;quot;);&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    }&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h4 id=&quot;and-more&quot;&gt;And More!&lt;/h4&gt;
+
+&lt;p&gt;After we have all the big picture items sorted out, it&amp;#39;s time to take a look at some of the &amp;quot;nice to haves&amp;quot;.  I poked around a few existing ORMs and found a few neat features that can add a lot of power to our shiny new toy:&lt;/p&gt;
+
+&lt;h5 id=&quot;custom-attributes&quot;&gt;Custom Attributes&lt;/h5&gt;
+
+&lt;p&gt;Sometimes you&amp;#39;ll want your model to be able to handle data that isn&amp;#39;t going to persist in the database.  The obvious example is creating a new &lt;code&gt;User&lt;/code&gt; record.  You&amp;#39;ll want to set &lt;code&gt;password&lt;/code&gt; and &lt;code&gt;password_confirmation&lt;/code&gt; on the model, and have them validate accordingly, but they won&amp;#39;t be saved to the database (at least, not in their current form).&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class User extends Model{&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $custom_attrs = [&amp;quot;password&amp;quot;, &amp;quot;password_confirmation&amp;quot;];&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h5 id=&quot;advanced-chaining&quot;&gt;Advanced Chaining&lt;/h5&gt;
+
+&lt;p&gt;We have a lot of really cool ideas defined above, including scopes, advanced query building, and associations.  These should all play nicely together, and a user should be able to use them in conjunction with one another to get to the data the need in record time.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;User::find(1)-&amp;gt;posts()-&amp;gt;published()-&amp;gt;where(&amp;quot;active = ?&amp;quot;, true)-&amp;gt;order(&amp;quot;created_date&amp;quot;)-&amp;gt;limit(5);&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The above would find all published sites belonging to the given User, where the site is marked as &lt;code&gt;active&lt;/code&gt;, ordered by the &lt;code&gt;created_date&lt;/code&gt;, and returning a maximum of 5 records.  That&amp;#39;s a really easy to read and concise way to get to the data, and I think meets our needs perfectly.&lt;/p&gt;
+
+&lt;h3 id=&quot;the-end-result&quot;&gt;The End Result&lt;/h3&gt;
+
+&lt;p&gt;Alright, we&amp;#39;ve just painted a pretty descriptive blueprint of where we want this ORM to end up.  Based on the above, I could define a pretty thorough class to describe a table and all of it&amp;#39;s associated data and requirements.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-php&quot; data-lang=&quot;php&quot;&gt;&lt;span class=&quot;x&quot;&gt;class User extends Model {&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    public static $custom_attrs = [&amp;quot;password&amp;quot;, &amp;quot;password_confirmation&amp;quot;];&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    public static $has_many = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;posts&amp;quot; =&amp;gt; [&amp;quot;class&amp;quot; =&amp;gt; &amp;quot;Post&amp;quot;, &amp;quot;foreign_key&amp;quot; =&amp;gt; &amp;quot;author_id&amp;quot;]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ];&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    public static $belongs_to = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;organization&amp;quot; =&amp;gt; [&amp;quot;class&amp;quot; =&amp;gt; &amp;quot;Organization&amp;quot;]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ];&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    public static $validations = [&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;email&amp;quot;    =&amp;gt; [&amp;quot;present&amp;quot;, &amp;quot;unique&amp;quot;],&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;name&amp;quot;     =&amp;gt; [&amp;quot;present&amp;quot;],&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        &amp;quot;password&amp;quot; =&amp;gt; [&amp;quot;present&amp;quot;, &amp;quot;matches&amp;quot; =&amp;gt; &amp;quot;password_confirmation&amp;quot;]&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    ];&lt;/span&gt;
+
+&lt;span class=&quot;x&quot;&gt;    function scopeActive(){&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;        return self::where(&amp;quot;active = ?&amp;quot;, true);&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;    }&lt;/span&gt;
+&lt;span class=&quot;x&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;I think that&amp;#39;s a pretty good starting point.  We&amp;#39;ve got a target we can aim for, and a set of features that every &lt;em&gt;real&lt;/em&gt; ORM has.  In the next post, we&amp;#39;ll start getting into the finer details of how our code will work, what the internal structure will look like, and how it all gets glued together.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;It&amp;#39;s rare that I advocate writing something from scratch when an off-the-shelf solution will fit your needs perfectly, as is almost always the case with an ORM.  This time, I got a little too curious, and I &lt;em&gt;wanted&lt;/em&gt; to know how the sausage was made.&lt;/p&gt;
+</description>
+        
+        <pubDate>Thu, 14 Jan 2016 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/deep-diving-into-orms/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/deep-diving-into-orms/</guid>
+        
+        <category>orm</category>
+        
+        <category>tempest</category>
+        
+        
       </item>
-    {% endfor %}
+      
+    
+      
+      <item>
+        <title>Passwords Don&#39;t Need to be Complicated</title>
+        <description>&lt;p&gt;The state of the password has changed a lot over the past several decades, and unfortunately, not for the better.  First, everyone had a few online accounts, and using the same password for the two or three accounts you might have had was probably pretty common. A few years go by and there are a whole slew of new services and sites, each with their own accounts and passwords. By now, it was common knowledge that using the same password for everything was Bad&amp;#8482;, so we started using a new password for every service. Time ticked on, and we all had 50 accounts across the web, and Password Managers become the best way to manage a veritable novel of usersnames and passwords.&lt;/p&gt;
+
+&lt;h3 id=&quot;password-managers&quot;&gt;Password Managers&lt;/h3&gt;
+
+&lt;p&gt;Password managers are the current &amp;quot;right way&amp;quot; to handle passwords.  You let the tool handle generating, storing, and applying your passwords.  It keeps things safe and sound, but also introduces a single point of failure.  If you&amp;#39;re using a service to handle things, that service can go away overnight (or be taken down temporarily by DDoS or similar attacks). If you&amp;#39;re using an app on your phone, a bad night out mean that a stranger holds all of your keys in their hand. If somebody is able to guess your master password, your entire online life is an open book. I never liked the idea of password managers, because at their core, they violate the first thing we all learned about passwords when we were children: &lt;em&gt;&amp;quot;Don&amp;#39;t write this down.&amp;quot;&lt;/em&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;something-new&quot;&gt;Something New&lt;/h3&gt;
+
+&lt;p&gt;For 2016, I decided that it&amp;#39;s time to fix the problem once and for all. It doesn&amp;#39;t need to be complicated. I decided to treat the problem like I treat most of my problems: How would I solve this if I had to code my way through it?&lt;/p&gt;
+
+&lt;h4 id=&quot;choose-a-base&quot;&gt;Choose a Base&lt;/h4&gt;
+
+&lt;p&gt;First, choose an easy to remember base for your password. It should be easy to remember, but still complex enough to avoid being guessed by a complete stranger, if it ever came down to it.  I opted to choose something that contained at least one upper-case letter and at least one number. I wanted this password to be accepted by almost any system I threw it at.  For the sake of argument, let&amp;#39;s say my base is &lt;strong&gt;Password1&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Note: It goes without saying, but you should keep the base a secret (Don&amp;#39;t write it down either!).&lt;/em&gt;&lt;/p&gt;
+
+&lt;h4 id=&quot;customize-per-service&quot;&gt;Customize Per Service&lt;/h4&gt;
+
+&lt;p&gt;Now, for every account you sign up for (or are changing your passwords for), define an algorithm that converts everything about that service into a simple string. Here&amp;#39;s a really easy one to get you started:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Use the domain name&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h4 id=&quot;smush-39-em-together&quot;&gt;Smush &amp;#39;em Together&lt;/h4&gt;
+
+&lt;p&gt;You&amp;#39;ve got the ingredients, now it&amp;#39;s time to make a password. Just combine your base and your &amp;quot;service slug&amp;quot; and you&amp;#39;re done.  Let&amp;#39;s imagine I&amp;#39;ve got a few accounts, maybe Github, Netflix, and GMail.&lt;/p&gt;
+
+&lt;table&gt;&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Service&lt;/th&gt;
+&lt;th&gt;Base&lt;/th&gt;
+&lt;th&gt;Domain&lt;/th&gt;
+&lt;th&gt;Slug&lt;/th&gt;
+&lt;th&gt;Password&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Github&lt;/td&gt;
+&lt;td&gt;Password1&lt;/td&gt;
+&lt;td&gt;github.com&lt;/td&gt;
+&lt;td&gt;github&lt;/td&gt;
+&lt;td&gt;githubPassword1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Netflix&lt;/td&gt;
+&lt;td&gt;Password1&lt;/td&gt;
+&lt;td&gt;netflix.com&lt;/td&gt;
+&lt;td&gt;netflix&lt;/td&gt;
+&lt;td&gt;netflixPassword1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;GMail&lt;/td&gt;
+&lt;td&gt;Password1&lt;/td&gt;
+&lt;td&gt;mail.google.com&lt;/td&gt;
+&lt;td&gt;google&lt;/td&gt;
+&lt;td&gt;googlePassword1&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+
+&lt;p&gt;Hmm, the passwords above aren&amp;#39;t very strong...But that&amp;#39;s because they&amp;#39;re examples, just for a proof of concept.  Let&amp;#39;s see what happens if we change things just  little bit:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Let&amp;#39;s choose a more complex password base: &lt;code&gt;TyQgcx9K&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Let&amp;#39;s choose a more complex algorithm for the &amp;quot;service slug&amp;quot;: The first character of each syllable of the domain name (&lt;code&gt;google.com&lt;/code&gt; =&amp;gt; &lt;code&gt;ggdc&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;We&amp;#39;ll put the password base &lt;strong&gt;before&lt;/strong&gt; the slug.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;table&gt;&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Service&lt;/th&gt;
+&lt;th&gt;Base&lt;/th&gt;
+&lt;th&gt;Domain&lt;/th&gt;
+&lt;th&gt;Slug&lt;/th&gt;
+&lt;th&gt;Password&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Github&lt;/td&gt;
+&lt;td&gt;TyQgcx9K&lt;/td&gt;
+&lt;td&gt;github.com&lt;/td&gt;
+&lt;td&gt;ghdc&lt;/td&gt;
+&lt;td&gt;TyQgcx9Kghdc&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Netflix&lt;/td&gt;
+&lt;td&gt;TyQgcx9K&lt;/td&gt;
+&lt;td&gt;netflix.com&lt;/td&gt;
+&lt;td&gt;nfdc&lt;/td&gt;
+&lt;td&gt;TyQgcx9Knfdc&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;GMail&lt;/td&gt;
+&lt;td&gt;TyQgcx9K&lt;/td&gt;
+&lt;td&gt;mail.google.com&lt;/td&gt;
+&lt;td&gt;ggdc&lt;/td&gt;
+&lt;td&gt;TyQgcx9Kggdc&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+
+&lt;h4 id=&quot;you-39-re-done&quot;&gt;You&amp;#39;re Done!&lt;/h4&gt;
+
+&lt;p&gt;That&amp;#39;s it. Your passwords are all unique to a single service, are all fairly secure, and there is no single point of failure.  There&amp;#39;s no risk of your Password Manager getting compromised, lost, or simply disappearing overnight. By choosing a complex &amp;quot;algorithm&amp;quot; for your passwords, there should be no identifiable information that gives the pattern away. With this pattern, I can sign into any service just by knowing the domain.  No risk, all reward.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;The state of the password has changed a lot over the past several decades, and unfortunately, not for the better.  First, everyone had a few online accounts, and using the same password for the two or three accounts you might have had was probably pretty common. A few years go by and there are a whole slew of new services and sites, each with their own accounts and passwords. By now, it was common knowledge that using the same password for everything was Bad&amp;#8482;, so we started using a new password for every service. Time ticked on, and we all had 50 accounts across the web, and Password Managers become the best way to manage a veritable novel of usersnames and passwords.&lt;/p&gt;
+</description>
+        
+        <pubDate>Sun, 03 Jan 2016 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/passwords-don't-need-to-be-complicated/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/passwords-don't-need-to-be-complicated/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>New Year, New Site</title>
+        <description>&lt;p&gt;For a long time, my site has sat stangnant, a desolate and dusty Wordpress blog that contained a few thoughts and musings from years past.  I&amp;#39;ve tried, over and over, to get back into content creation for my personal site, but I always fall short. Whether I get too busy with work, find a more involving hobby, or straight up forget, things end up the same way; no blog updates.&lt;/p&gt;
+
+&lt;p&gt;Well, this year I&amp;#39;m starting from the ground up.  I&amp;#39;m moving off of Wordpress (a move I&amp;#39;ve wanted to make for a long time), and have opted to let most of my previous posts evaporate into the ether in the process. I&amp;#39;ve grown and changed a lot since they were written, and would rather revisit those topics as they come up, with fresh eyes and fresh insight.&lt;/p&gt;
+
+&lt;p&gt;So, here&amp;#39;s to 2016 and (hopefully) a plethora of fresh thoughts, ideas, and content!&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;For a long time, my site has sat stangnant, a desolate and dusty Wordpress blog that contained a few thoughts and musings from years past.  I&amp;#39;ve tried, over and over, to get back into content creation for my personal site, but I always fall short. Whether I get too busy with work, find a more involving hobby, or straight up forget, things end up the same way; no blog updates.&lt;/p&gt;
+</description>
+        
+        <pubDate>Fri, 01 Jan 2016 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/new-year-new-site/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/new-year-new-site/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>Phonebook.js - Managing Your AJAX Soup</title>
+        <description>&lt;p&gt;With the onset of modern web technologies and the advent of the MVC/VM wars, it was pretty much forgotten that a lot of projects aren&amp;#39;t in the right place to use these new &amp;quot;auto-ajax&amp;quot; toolsets. Perhaps they&amp;#39;re legacy projects, or maybe they&amp;#39;re being built by people who either don&amp;#39;t understand or like the MV* approach.  In either case, projects that are just using a &amp;quot;legacy&amp;quot; approach to AJAX can quickly devolve into a bowl of soup.  The code becomes bloated and hard to follow, and it&amp;#39;s not immediately apparent what&amp;#39;s happening when you look at it.&lt;/p&gt;
+
+&lt;p&gt;Phonebook.js fixes this by providing a lightweight (1.33kb minified) wrapper around your AJAX calls, allowing you to define a manageable &amp;quot;API consumer&amp;quot; which you can use throughout your project.&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-js&quot; data-lang=&quot;js&quot;&gt;&lt;span class=&quot;c1&quot;&gt;// Turn this:&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;request&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;ajax&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;url&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;/api/users/all&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;type&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;get&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;dataType&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;json&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;s2&quot;&gt;&amp;quot;active&amp;quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// Into this:&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;request&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;API&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;users&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;all&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You can view the project on &lt;a href=&quot;https://github.com/mtrpcic/phonebook&quot;&gt;github&lt;/a&gt;.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;With the onset of modern web technologies and the advent of the MVC/VM wars, it was pretty much forgotten that a lot of projects aren&amp;#39;t in the right place to use these new &amp;quot;auto-ajax&amp;quot; toolsets. Perhaps they&amp;#39;re legacy projects, or maybe they&amp;#39;re being built by people who either don&amp;#39;t understand or like the MV* approach.  In either case, projects that are just using a &amp;quot;legacy&amp;quot; approach to AJAX can quickly devolve into a bowl of soup.  The code becomes bloated and hard to follow, and it&amp;#39;s not immediately apparent what&amp;#39;s happening when you look at it.&lt;/p&gt;
+</description>
+        
+        <pubDate>Mon, 13 May 2013 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/phonebook-js-managing-your-ajax-soup/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/phonebook-js-managing-your-ajax-soup/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>Project, Process, Profit</title>
+        <description>&lt;p&gt;For the past several weeks, there has been a lot of discussion both online and in my office about the &amp;quot;ideal&amp;quot; practices when it comes to software development.  What steps should be taken before you start coding?  How much planning should you do?  How do you eliminated scope creep?  Around the same time we were holding these discussions at work, &lt;a href=&quot;https://www.reddit.com/r/learnprogramming/comments/17mwsb/can_a_professional_programmer_explain_the_thought/&quot;&gt;someone asked on Reddit&lt;/a&gt;.  While I was a little bit late to the game, my comment received a fair amount of traction, and even generated some direct messages with questions and comments.  I thought the ideas worked well, and decided to post them here as well.&lt;/p&gt;
+
+&lt;p&gt;The following are the steps that I try to follow when starting up a new project, whether it&amp;#39;s going to be a web application, a useful library, or anything in between.&lt;/p&gt;
+
+&lt;h4 id=&quot;1-basic-idea&quot;&gt;1. Basic Idea&lt;/h4&gt;
+
+&lt;p&gt;I usually start by getting some idea stuck in my head. It&amp;#39;ll come to me while on the train, maybe laying in bed, or while watching TV. If it&amp;#39;s a good idea, I&amp;#39;ll think about it a bit more, and start to think about features. At this point, it&amp;#39;s all in my head.&lt;/p&gt;
+
+&lt;h4 id=&quot;2-features-and-user-stories&quot;&gt;2. Features and User Stories&lt;/h4&gt;
+
+&lt;p&gt;Once I&amp;#39;ve rolled an idea around in my head for a while, it starts to evolve and get uniquely defined features. At this point, I&amp;#39;ll start by writing the features out in a notebook somewhere (for me, hard copy helps my ideas flow better than using a computer). After a rough point-form list of features is done, I make them more details as &amp;quot;User Stories&amp;quot;, which look like this:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-text&quot; data-lang=&quot;text&quot;&gt;As A User:
+  I want to be able to register for an account by entering my email
+  and password.
+
+  I want to be able to post notifications and have them automatically
+  be emailed to all of my subscribers
+
+As A Subscriber:
+  I want to automatically receive emails whenever one of the users
+  I follow submits a notification.
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You&amp;#39;ll notice these are basically lists of &amp;quot;Wants&amp;quot;. Also notice that the list is fairly fine grained, and can be quite long. Once you know what you want, you can go a step further.&lt;/p&gt;
+
+&lt;h4 id=&quot;3-mockups&quot;&gt;3. Mockups&lt;/h4&gt;
+
+&lt;p&gt;If my application is going to have a user interface (like a desktop or web application), I&amp;#39;ll draw a few sketches in a notebook. I am not a designer, artist, or User Experience professional, so these sketches always look terrible and never stick, but they help me to find the rough &amp;quot;look and feel&amp;quot; that I&amp;#39;m going for.&lt;/p&gt;
+
+&lt;p&gt;If you&amp;#39;re more technically inclined, you can get &lt;a href=&quot;https://balsamiq.com/products/mockups/&quot;&gt;Balsamiq Mockups&lt;/a&gt; and create interactive mockups on the computer. I highly recommend this product.&lt;/p&gt;
+
+&lt;h4 id=&quot;4-deciding-on-tools&quot;&gt;4. Deciding on Tools&lt;/h4&gt;
+
+&lt;p&gt;Ok, so now I know exactly what I want to build, from features to (rough) design. The next step is to decide on my toolset. I&amp;#39;m familiar with many different languages, libraries, and frameworks, so I sit down and do a bit of research to find the best one(s) for this project.&lt;/p&gt;
+
+&lt;p&gt;For example, if I&amp;#39;m creating a real-time, auto-updating web application, I&amp;#39;ll do some research to find out which web servers I&amp;#39;m familiar with have the best support for WebSockets, and might find out that &lt;a href=&quot;https://github.com/mrjoes/sockjs-tornado/&quot;&gt;I can integrate my HTTP and WebSocket server if I use Tornado and SockJS&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h4 id=&quot;5-planning&quot;&gt;5. Planning&lt;/h4&gt;
+
+&lt;p&gt;Once the tools are decided upon, I plan the project out. I rarely need to come up with my own directory structure, as whatever framework I&amp;#39;m using will dictate one for me, whether it&amp;#39;s &lt;a href=&quot;http://rubyonrails.org/&quot;&gt;Ruby on Rails&lt;/a&gt; or &lt;a href=&quot;https://www.djangoproject.com/&quot;&gt;Django&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;To start my planning, I create a new board on &lt;a href=&quot;https://trello.com/&quot;&gt;Trello&lt;/a&gt;, and give it four columns, labelled &amp;quot;To Do&amp;quot;, &amp;quot;In Process&amp;quot;, &amp;quot;To Verify&amp;quot;, and &amp;quot;Done&amp;quot;. I convert each user story from Step 2 into a task in my &amp;quot;To Do&amp;quot; list. I also add a few other tasks that relate to the general &amp;quot;start up&amp;quot; process for a project, such as setting up a &lt;a href=&quot;https://github.com/&quot;&gt;Github&lt;/a&gt; repository, etc.&lt;/p&gt;
+
+&lt;h4 id=&quot;6-development&quot;&gt;6. Development&lt;/h4&gt;
+
+&lt;p&gt;Ok, I know what all my features are. I know what tools I will use to build the site. I know what all my tasks are. I&amp;#39;m ready to start. I go through the tasks in whatever order I feel makes sense (keep in mind, some tasks will require others to be completed first), and add those features to my program. When I start a task, I move it to the &amp;quot;In Process&amp;quot; list in Trello, and when I&amp;#39;m done it, it goes into &amp;quot;To Verify&amp;quot;. &lt;strong&gt;It does not go in &amp;quot;Done&amp;quot;!&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;After about a week has passed, I&amp;#39;ll go back to the &amp;quot;To Verify&amp;quot; task in Trello and read the user story I put together. I then try to do what it says in my application, and ensure it works. If you have two or more developers on a team, it is good practice to only verify someone elses work. The reason I wait a week is so that I &amp;quot;forget&amp;quot; some of the &amp;quot;quick tricks&amp;quot; you learn while repeatedly trying/testing during development. Being stuck in this routine while verifying can cause you to miss things.&lt;/p&gt;
+
+&lt;p&gt;Once a task is verified, it goes into the &amp;quot;Done&amp;quot; column. Once all tasks are in the Done column, the project is &amp;quot;complete&amp;quot;. Many times, I&amp;#39;ll do a project over multiple iterations, so this set of steps will happen once or twice, with a different starting point each time.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;For the past several weeks, there has been a lot of discussion both online and in my office about the &amp;quot;ideal&amp;quot; practices when it comes to software development.  What steps should be taken before you start coding?  How much planning should you do?  How do you eliminated scope creep?  Around the same time we were holding these discussions at work, &lt;a href=&quot;https://www.reddit.com/r/learnprogramming/comments/17mwsb/can_a_professional_programmer_explain_the_thought/&quot;&gt;someone asked on Reddit&lt;/a&gt;.  While I was a little bit late to the game, my comment received a fair amount of traction, and even generated some direct messages with questions and comments.  I thought the ideas worked well, and decided to post them here as well.&lt;/p&gt;
+</description>
+        
+        <pubDate>Wed, 20 Feb 2013 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/project-process-profit/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/project-process-profit/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>DemoCamp Hamilton 5: PathJS</title>
+        <description>&lt;p&gt;I&amp;#39;ve been invited to speak at DemoCamp Hamilton 5 on February 9th of this year. I&amp;#39;ll be giving a brief demo of PathJS, a client side routing library that leverages the power of &amp;quot;Hashbang&amp;quot; URLs in an intuitive wrapper. This will be the first time at a DemoCamp Hamilton that a code library is demo&amp;#39;d (as opposed to product demos), and I&amp;#39;m incredibly excited to have the opportunity to break that particular ice.  Nearly every demo thus far as either been web-based, or had some web-based component.  PathJS allows all of these products to leverage the latest web technologies to improve performance and make the leap from &lt;em&gt;web page&lt;/em&gt; to &lt;em&gt;web application&lt;/em&gt;.  See you there!&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;I&amp;#39;ve been invited to speak at DemoCamp Hamilton 5 on February 9th of this year. I&amp;#39;ll be giving a brief demo of PathJS, a client side routing library that leverages the power of &amp;quot;Hashbang&amp;quot; URLs in an intuitive wrapper. This will be the first time at a DemoCamp Hamilton that a code library is demo&amp;#39;d (as opposed to product demos), and I&amp;#39;m incredibly excited to have the opportunity to break that particular ice.  Nearly every demo thus far as either been web-based, or had some web-based component.  PathJS allows all of these products to leverage the latest web technologies to improve performance and make the leap from &lt;em&gt;web page&lt;/em&gt; to &lt;em&gt;web application&lt;/em&gt;.  See you there!&lt;/p&gt;
+</description>
+        
+        <pubDate>Wed, 01 Feb 2012 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/democamp-hamilton-5/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/democamp-hamilton-5/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>Introducing PollJS: Javascript timers made easy</title>
+        <description>&lt;p&gt;One thing that has always caused issue when writing web applications is the issue of querying the server for long-running background tasks (generating thumbnails or PDF&amp;#39;s, sending batch emails, etc).  Often times these actions are too long-running to be contained in an HTTP request, so a short request is made and an interval is set up to begin querying for the eventual finish.  This isn&amp;#39;t a terrible way to do things, but the barebones methods that the browser provides are somewhat lackluster. For example, to kill an interval you need to assign the returned value of your &lt;code&gt;setInterval&lt;/code&gt; call to a variable, and clear it out with &lt;code&gt;clearInterval&lt;/code&gt;. This means you need to keep reference to the Interval ID, and that reference must live there. If your user is going to be using the application during this time, you&amp;#39;ll need to store this variable somewhere high up the ladder (possibly even as a global!), simply so you can clear it later.&lt;/p&gt;
+
+&lt;p&gt;But what if that long running job never gets executed during this particular session?  And what if you have many different operations that need this type of implementation?  You&amp;#39;ve now got your global namespace polluted with oft-unused variables.  That&amp;#39;s where PollJS steps in.&lt;/p&gt;
+
+&lt;p&gt;PollJS is a convenience wrapper for the native &amp;quot;setTimeout&amp;quot;, &amp;quot;setInterval&amp;quot;, &amp;quot;clearTimeout&amp;quot;, and &amp;quot;clearInterval&amp;quot; methods.  It wraps them with a simple definition method, and extends their functionality with additional options:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-js&quot; data-lang=&quot;js&quot;&gt;&lt;span class=&quot;c1&quot;&gt;// A Basic Example&lt;/span&gt;
+&lt;span class=&quot;nx&quot;&gt;Poll&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({&lt;/span&gt;
+    &lt;span class=&quot;s2&quot;&gt;&amp;quot;update_users&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;interval&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;1500&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;action&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;alert&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;Updated!&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;Poll&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;stop&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;update_users&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You can read more about the project, and download the source code on the &lt;a href=&quot;https://github.com/mtrpcic/polljs&quot;&gt;Github page&lt;/a&gt;.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;One thing that has always caused issue when writing web applications is the issue of querying the server for long-running background tasks (generating thumbnails or PDF&amp;#39;s, sending batch emails, etc).  Often times these actions are too long-running to be contained in an HTTP request, so a short request is made and an interval is set up to begin querying for the eventual finish.  This isn&amp;#39;t a terrible way to do things, but the barebones methods that the browser provides are somewhat lackluster. For example, to kill an interval you need to assign the returned value of your &lt;code&gt;setInterval&lt;/code&gt; call to a variable, and clear it out with &lt;code&gt;clearInterval&lt;/code&gt;. This means you need to keep reference to the Interval ID, and that reference must live there. If your user is going to be using the application during this time, you&amp;#39;ll need to store this variable somewhere high up the ladder (possibly even as a global!), simply so you can clear it later.&lt;/p&gt;
+</description>
+        
+        <pubDate>Mon, 22 Aug 2011 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/polljs-javascript-timers-made-easy/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/polljs-javascript-timers-made-easy/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>Documentation - The Nectar of the Gods</title>
+        <description>&lt;p&gt;Since day one of college, documentation was toted as being of the utmost importance.  It was necessary, at all times and in every situation.  &amp;quot;By god, what does the variable &amp;quot;i&amp;quot; mean in this &amp;quot;for&amp;quot; loop!?&amp;quot; I could imagine my professors mumbling as they read through my code.  Of course, when I was writing that code, it was painfully obvious what &amp;quot;i&amp;quot; was doing.  It&amp;#39;s &lt;strong&gt;always&lt;/strong&gt; obvious what &amp;quot;i&amp;quot; is doing - isn&amp;#39;t it?&lt;/p&gt;
+
+&lt;p&gt;Of course, my example above is a bit simplified, but it proves the point none the same.  No matter how complex the code that you&amp;#39;re currently working on may seem, it&amp;#39;s always within the realm of understandability.  Step back for several weeks, and walk into the hellish nightmare that is &lt;strong&gt;The Spaghetti Abyss&lt;/strong&gt;, and you&amp;#39;ll spend five minutes wondering, &amp;quot;What the hell was this fool doing?&amp;quot; followed by a brief flash of recollection and embarrassment - &amp;quot;Gasp! I am that fool!&amp;quot;&lt;/p&gt;
+
+&lt;p&gt;And therein lies the rub.&lt;/p&gt;
+
+&lt;p&gt;As soon as I finished my time in school, documentation seemed much less important.  You see, up until this point, students had been documenting merely to get the marks for it.  We documented our code because our grades depended on it.  As soon as I stepped out those doors for the final time, I remember thinking I was free of that nightmare.  I was a good programmer, I could look at code and understand what was happening under the hood; I didn&amp;#39;t need an explanation.&lt;/p&gt;
+
+&lt;p&gt;Fast forward a couple of months, and I&amp;#39;m at work, trying to solve a particularly bad problem - a problem I inadvertently produced several weeks back, in a module that had since been left to stew in the bowels of a great beast of a project so terrifying, so insidious, it was Beelzebub incarnate (in code).  I open that file, thinking &amp;quot;This will be an easy fix - after all, I wrote it.&amp;quot;  Never have I been more wrong in my life.  My undocumented code put a bucket over my head and slammed it with a baseball bat.  It took me several days to fix a bug that was incredibly simple, but my lack of documentation fanned the flames until my ego was burned to the ground.  I wasn&amp;#39;t a good programmer anymore; a good programmer wouldn&amp;#39;t have run into this problem.&lt;/p&gt;
+
+&lt;p&gt;Fast forward yet again.  I need to delve deep within the source code of &lt;a href=&quot;https://github.com/rails/rails/tree/master/activesupport&quot;&gt;ActiveSupport&lt;/a&gt;.  I&amp;#39;m looking at code written by the deities of code, heavy hitters within the Ruby community. These men and women know Ruby from top to bottom, inside out, and to a peasant like me, it looked like they were making use of every trick in the book to get things done.  But, if that was the case, why was it so easy for me to understand everything?  Why was I able to follow along at a nice leasurely pace, instead of having my eyes melt off my face? Oh, I see now...&lt;/p&gt;
+
+&lt;p&gt;This code had documentation.  This code had a dictionary beside it, and I could find out what everything was doing every step of the way.  This code was &lt;strong&gt;easy&lt;/strong&gt;.&lt;/p&gt;
+
+&lt;p&gt;It takes a situation like the one described above to let you know how important something really is.  You can be an amazing problem solver, and a prolific programmer, but you won&amp;#39;t ever be considered one of the best until your code can be understood by thousands of people at a glance.  Now that I&amp;#39;ve got my own projects, I make sure that I do my best to document every code change.  I try to act like one of the best, because I&amp;#39;d like to be one of the best.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;Since day one of college, documentation was toted as being of the utmost importance.  It was necessary, at all times and in every situation.  &amp;quot;By god, what does the variable &amp;quot;i&amp;quot; mean in this &amp;quot;for&amp;quot; loop!?&amp;quot; I could imagine my professors mumbling as they read through my code.  Of course, when I was writing that code, it was painfully obvious what &amp;quot;i&amp;quot; was doing.  It&amp;#39;s &lt;strong&gt;always&lt;/strong&gt; obvious what &amp;quot;i&amp;quot; is doing - isn&amp;#39;t it?&lt;/p&gt;
+</description>
+        
+        <pubDate>Mon, 25 Jul 2011 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/documentation-the-nectar-of-the-gods/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/documentation-the-nectar-of-the-gods/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>PathJS and HTML History - A Match Made in Heaven</title>
+        <description>&lt;p&gt;Nobody will argue that the &lt;a href=&quot;http://diveintohtml5.info/history.html&quot;&gt;HTML5 History API&lt;/a&gt; was a step in the right direction in regards to Web Applications.  Unfortunately, there was no simple, consolidated way that provided a routing mechanic that was both versatile and easy to manage.  As of today, the simple routing mechanic of PathJS is fully compatible with the HTML5 History API.  You get the power of a manual, with the simplicity of an automatic.  Here&amp;#39;s how it works:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-js&quot; data-lang=&quot;js&quot;&gt;&lt;span class=&quot;c1&quot;&gt;// Define all your routes as you usually would with PathJS - Simply omit the &amp;quot;#&amp;quot;&lt;/span&gt;
+&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;map&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;/home&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;to&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;console&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;Welcome home!&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;map&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;/users&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;to&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;console&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;Users, users, users.&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;map&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;/contact&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;to&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;console&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;log&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;Feel free to contact me via Github.&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// Now override the click events for any of your links, and call&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;// the Path.history.pushState method to invoke the PathJS router.&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// This example uses jQuery.&lt;/span&gt;
+&lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;a&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;live&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;click&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;){&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;preventDefault&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;history&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;pushState&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;({},&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;attr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;href&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;));&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;It&amp;#39;s simple as that.  The PathJS implementation of the HTML5 History API supports the same features as regular PathJS, including:  Before-filter chaining, enter/exit methods, parameterized routes, and optional route parameters.  You can read more about it&amp;#39;s features and limitations on the &lt;a href=&quot;https://github.com/mtrpcic/pathjs&quot;&gt;Github Page&lt;/a&gt;.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;Nobody will argue that the &lt;a href=&quot;http://diveintohtml5.info/history.html&quot;&gt;HTML5 History API&lt;/a&gt; was a step in the right direction in regards to Web Applications.  Unfortunately, there was no simple, consolidated way that provided a routing mechanic that was both versatile and easy to manage.  As of today, the simple routing mechanic of PathJS is fully compatible with the HTML5 History API.  You get the power of a manual, with the simplicity of an automatic.  Here&amp;#39;s how it works:&lt;/p&gt;
+</description>
+        
+        <pubDate>Tue, 19 Jul 2011 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/pathjs-and-html5-history-a-match-made-in-heaven/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/pathjs-and-html5-history-a-match-made-in-heaven/</guid>
+        
+        
+      </item>
+      
+    
+      
+      <item>
+        <title>Hashbang URIs - They&#39;re Not That Bad; Really</title>
+        <description>&lt;p&gt;The internet has been abuzz since the suite of &lt;a href=&quot;http://gawker.com/&quot;&gt;Gawker&lt;/a&gt; sites switched from regular old links, to &lt;a href=&quot;https://en.wikipedia.org/wiki/Fragment_identifier&quot;&gt;Fragment URIs&lt;/a&gt;. Long story short, a JavaScript bug caused all content, on all of their sites, to be inaccessible to the entire world. Ouch, I know. But just because one developer made a farce of a piece of technology doesn&amp;#39;t make it as horrendous as everyone&amp;#39;s saying it is.&lt;/p&gt;
+
+&lt;h3 id=&quot;a-brief-introduction&quot;&gt;A Brief Introduction&lt;/h3&gt;
+
+&lt;p&gt;So what&amp;#39;s the big guffaw all about?  Wikipedia uses Fragment Identifiers to jump around the page, don&amp;#39;t they?  Well yeah, but that&amp;#39;s just static content.  The big dilemma is over the loading of remote content when a new fragment identifier is loaded.  It&amp;#39;s a nice way to load remote content, while still allowing the user to use the &amp;quot;Back&amp;quot; button properly.  Why would anyone want to do this, you might ask?  Well, let me tell you.&lt;/p&gt;
+
+&lt;h3 id=&quot;some-numbers&quot;&gt;Some Numbers&lt;/h3&gt;
+
+&lt;p&gt;When loading any website, there&amp;#39;s two things you pull from the server.  The Markup (HTML), which structures the page, and your helpers (CSS and JavaScript) to pretty the beast up, and make him shine.  I took a look at 4 sites that are kind of a big deal, to see what was being loaded every time I hit their homepage:&lt;/p&gt;
+
+&lt;table&gt;&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Site&lt;/th&gt;
+&lt;th&gt;HTML&lt;/th&gt;
+&lt;th&gt;CSS&lt;/th&gt;
+&lt;th&gt;JS&lt;/th&gt;
+&lt;th&gt;Total&lt;/th&gt;
+&lt;th&gt;Content&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Reddit&lt;/td&gt;
+&lt;td&gt;37.6KB&lt;/td&gt;
+&lt;td&gt;20.2KB&lt;/td&gt;
+&lt;td&gt;47.7KB&lt;/td&gt;
+&lt;td&gt;105.5KB&lt;/td&gt;
+&lt;td&gt;35.6% Content&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Google&lt;/td&gt;
+&lt;td&gt;12.2KB&lt;/td&gt;
+&lt;td&gt;0KB (Inlined)&lt;/td&gt;
+&lt;td&gt;73.1KB&lt;/td&gt;
+&lt;td&gt;85.3KB&lt;/td&gt;
+&lt;td&gt;14.3% Content&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;YouTube&lt;/td&gt;
+&lt;td&gt;20.9KB&lt;/td&gt;
+&lt;td&gt;1.3KB&lt;/td&gt;
+&lt;td&gt;17.1KB&lt;/td&gt;
+&lt;td&gt;39.3KB&lt;/td&gt;
+&lt;td&gt;53.2% Content&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Github&lt;/td&gt;
+&lt;td&gt;7.3KB&lt;/td&gt;
+&lt;td&gt;61.5KB&lt;/td&gt;
+&lt;td&gt;127.9KB&lt;/td&gt;
+&lt;td&gt;196.2KB&lt;/td&gt;
+&lt;td&gt;3.7% Content&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+
+&lt;p&gt;It looks like nearly every site is loading a lot of stuff other than content, especially Github.  Every time a request hits the server, it has to handle this additional content if it&amp;#39;s not cached. If that&amp;#39;s the case, taking away the constant loading of the JavaScript and CSS can significantly decrease bandwidth and server load. In addition to not needing to fetch the external resources, you also cut down on the amount of HTML required to be loaded with every request, as the DOM structure is only loaded once, and only the content needs to be loaded with every request. In the case of Reddit.com, the majority of HTML loaded is DOM structure and static content, with only 5.9 KB of the 37.6 KB being real, interesting content.  The example below is a rudimentary way to accomplish this, with very little overhead in cost, time, or complexity.&lt;/p&gt;
+
+&lt;h3 id=&quot;server-side&quot;&gt;Server Side&lt;/h3&gt;
+
+&lt;p&gt;There are three things you need to do to make this work, and that&amp;#39;s it.  First, make all internal links begin with the root of your site, sans the domain name.  We want things that &amp;quot;/look/like/this&amp;quot;.  Next, modify all of your content and views to host the majority of your markup in a Layout of some sort.  Basically, your controller action should only return a block of content that will be placed into the body tag of the layout.  Finally, modify your controller actions to return the content sans layout when AJAX comes calling.  In rails, it would be as simple as:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-ruby&quot; data-lang=&quot;ruby&quot;&gt;&lt;span class=&quot;k&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;WidgetController&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;ApplicationController&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;def&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;index&lt;/span&gt;
+    &lt;span class=&quot;vi&quot;&gt;@widgets&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;no&quot;&gt;Widget&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;all&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;respond_to&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;do&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;wants&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;|&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;wants&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;html&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{}&lt;/span&gt;
+      &lt;span class=&quot;n&quot;&gt;wants&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;js&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;render&lt;/span&gt; &lt;span class=&quot;ss&quot;&gt;:layout&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;kp&quot;&gt;false&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+  &lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;end&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;That&amp;#39;s it.  Now, when AJAX hits any of your existing controller actions, they&amp;#39;ll return the content without the layout.&lt;/p&gt;
+
+&lt;h3 id=&quot;client-side&quot;&gt;Client Side&lt;/h3&gt;
+
+&lt;p&gt;There are two things to do here.  First, you&amp;#39;re going to intercept the click of every &amp;quot;a&amp;quot; tag on your site.  This is easy with jQuery:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-js&quot; data-lang=&quot;js&quot;&gt;&lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;a&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;live&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;click&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;){&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;href&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;attr&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;href&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;href&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;/&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;){&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;event&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;preventDefault&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;nb&quot;&gt;window&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;hash&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;#!&amp;quot;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;+&lt;/span&gt; &lt;span class=&quot;nx&quot;&gt;href&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The code block above checks to see if the link goes to a local resource, and if so, intercepts it, stops the link from acting, and changes the Resource Identifier instead.  Now, using a library like PathJS, listen for route changes and act accordingly.  With pathJS, it&amp;#39;s as simple as:&lt;/p&gt;
+&lt;div class=&quot;highlight&quot;&gt;&lt;pre&gt;&lt;code class=&quot;language-js&quot; data-lang=&quot;js&quot;&gt;&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;default&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(){&lt;/span&gt;
+    &lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;get&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nb&quot;&gt;window&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;location&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;hash&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;replace&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;#!&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;s2&quot;&gt;&amp;quot;&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;),&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;function&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;){&lt;/span&gt;
+        &lt;span class=&quot;nx&quot;&gt;$&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s2&quot;&gt;&amp;quot;#contents&amp;quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;html&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;data&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;});&lt;/span&gt;
+
+&lt;span class=&quot;nx&quot;&gt;Path&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nx&quot;&gt;listen&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now, whenever a local resource link is clicked, it will be picked up and routed to the default function.  This function does an AJAX call to get new content, which is returned without the layout thanks to our controller action changes, and injects it into the DOM.  Fast and easy.  If a user hits your site with JavaScript disabled, the links will never be intercepted, and will go to your regular routes, returned with the layout intact.&lt;/p&gt;
+
+&lt;h3 id=&quot;but-what-about&quot;&gt;But what about...&lt;/h3&gt;
+
+&lt;p&gt;There are a few things people complain about when confronted with as simple a solution as this:&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;It doesn&amp;#39;t make use of the HTML5 History API!&lt;/strong&gt;&lt;br&gt;
+The example above does not, but the onus is on you as the application developer to build in support for that.  As time progresses, libraries like PathJS will be updated  to integrate with new technologies, but the HTML5 spec is ever changing, and the majority of browser market share doesn&amp;#39;t support a lot of these new technologies.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;If I have JavaScript enabled, and send my friend (who has JavaScript disabled) a &amp;quot;Hashbang&amp;quot; URI, he won&amp;#39;t load the content!&lt;/strong&gt;&lt;br&gt;
+You&amp;#39;re right.  This is the primary drawback of an approach like this, and you&amp;#39;ll need to figure out if that&amp;#39;s acceptable for you.  Are you building a website, or a web application?  Will users ever share links?  What if you&amp;#39;re developing an Admin Panel for an internal company tool, an authentication-locked wiki system, or any application that relies on JavaScript to function (image editing, data plotting, etc)?  In those cases, users won&amp;#39;t be sharing links, and it&amp;#39;s a moot point.  On the other end of the spectrum, you could be building a website, not an application, where users can often share links.  Well, what is your target audience?  Are they likely to have JavaScript disabled?  Is the edge-case of a broken shared link worth the benefits an approach like this provides?  These are all questions that you and your development team need to answer before making a decision.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;Won&amp;#39;t browser caching reduce server load already?&lt;/strong&gt;&lt;br&gt;
+Yes and no.  In a perfect world, that would be the case.  However, there are a lot of things that can cause the server to send the additional contents on every request, such as  improperly set Headers, browsers with caching turned off/unsupported, clients that don&amp;#39;t respect server headers, or any of a multitude of other possible scenarios.  In cases like these, a solution like &amp;quot;Hashbang URIs&amp;quot; makes sense.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Edit: In addition to the cases above, which are unlikely in the best of scenarios (as was pointed out to me by friends and strangers alike), some browsers have a very low cache limit, namely the mobile browser market.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h3&gt;
+
+&lt;p&gt;No, it&amp;#39;s not perfect.  No, it&amp;#39;s not a solution for everyone. Yes, it has drawbacks and downsides.  So what?  It&amp;#39;s pushing the boundaries of the browser, and treating the web as an Application Platform, rather than a dumb terminal for reading content and data entry.  The &amp;quot;Hashbang URI&amp;quot; makes your application feel like an application, instead of a website.  The drawbacks are things that need to be weighed against the benefits in your unique case, and the decision will be different for everyone.&lt;/p&gt;
+
+&lt;p&gt;Just because it doesn&amp;#39;t make sense for you to use it, doesn&amp;#39;t mean it&amp;#39;s a stupid idea.  You are not the center of the Universe.&lt;/p&gt;
+</description>
+        
+          <description>&lt;p&gt;The internet has been abuzz since the suite of &lt;a href=&quot;http://gawker.com/&quot;&gt;Gawker&lt;/a&gt; sites switched from regular old links, to &lt;a href=&quot;https://en.wikipedia.org/wiki/Fragment_identifier&quot;&gt;Fragment URIs&lt;/a&gt;. Long story short, a JavaScript bug caused all content, on all of their sites, to be inaccessible to the entire world. Ouch, I know. But just because one developer made a farce of a piece of technology doesn&amp;#39;t make it as horrendous as everyone&amp;#39;s saying it is.&lt;/p&gt;
+</description>
+        
+        <pubDate>Wed, 16 Feb 2011 00:00:00 +0000</pubDate>
+        <link>https://mtrpcic.net/blog/hashbang-uris-theyre-not-as-bad-as-you-think/</link>
+        <guid isPermaLink="true">https://mtrpcic.net/blog/hashbang-uris-theyre-not-as-bad-as-you-think/</guid>
+        
+        
+      </item>
+      
+    
   </channel>
 </rss>
